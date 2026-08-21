@@ -1,10 +1,6 @@
 // Package wake contains the application use case for requesting a wake.
 package wake
 
-import "errors"
-
-var errNotImplemented = errors.New("pc-control wake use case: not implemented")
-
 // Sender is the outbound boundary used by the wake use case.
 //
 // Send deliberately does not accept a request context: after a wake command
@@ -25,5 +21,5 @@ func New(sender Sender) *UseCase {
 
 // Wake performs a wake command.
 func (u *UseCase) Wake() error {
-	return errNotImplemented
+	return u.sender.Send()
 }
