@@ -68,6 +68,7 @@ func reserveTCPAddress(t *testing.T) string {
 }
 
 func TestFullCompositionWakeAcceptance(t *testing.T) {
+	shutdownFixture := newAcceptanceSSHFixture(t)
 	udpReceiver, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	if err != nil {
 		t.Fatalf("ListenUDP() error = %v", err)
@@ -77,6 +78,7 @@ func TestFullCompositionWakeAcceptance(t *testing.T) {
 	udpPort := udpReceiver.LocalAddr().(*net.UDPAddr).Port
 	httpAddress := reserveTCPAddress(t)
 	setValidEnvironment(t, httpAddress, "127.0.0.1", udpPort)
+	setValidShutdownEnvironment(t, shutdownFixture)
 
 	service, err := server.NewFromEnv()
 	if err != nil {

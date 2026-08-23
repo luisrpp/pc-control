@@ -10,13 +10,13 @@ import (
 	"github.com/luisrpp/pc-control/internal/wake"
 )
 
-// Handler is the HTTP adapter for the wake use case.
+// Handler is the HTTP adapter for wake and shutdown use cases.
 type Handler struct {
 	waker      *wake.UseCase
 	shutdowner *shutdown.UseCase
 }
 
-// NewHandler creates an HTTP adapter for waker.
+// NewHandler creates an HTTP adapter for waker and, when provided, shutdowner.
 func NewHandler(waker *wake.UseCase, shutdowners ...*shutdown.UseCase) http.Handler {
 	handler := &Handler{waker: waker}
 	if len(shutdowners) > 0 {
@@ -27,10 +27,21 @@ func NewHandler(waker *wake.UseCase, shutdowners ...*shutdown.UseCase) http.Hand
 
 // ServeHTTP handles an HTTP request.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/v1/wake" || r.URL.EscapedPath() != "/v1/wake" {
+	switch {
+	case exactPath(r, "/v1/wake"):
+		h.serveWake(w, r)
+	case exactPath(r, "/v1/shutdown"):
+		h.serveShutdown(w, r)
+	default:
 		writeError(w, r, http.StatusNotFound, "not_found", "requested endpoint was not found")
-		return
 	}
+}
+
+func exactPath(r *http.Request, path string) bool {
+	return r.URL.Path == path && r.URL.EscapedPath() == path
+}
+
+func (h *Handler) serveWake(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
 		writeError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method is not allowed for this endpoint")
@@ -45,6 +56,23 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, r, http.StatusOK, map[string]string{"result": "sent"})
+}
+
+func (h *Handler) serveShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		writeError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method is not allowed for this endpoint")
+		return
+	}
+	if r.URL.RawQuery != "" || !emptyBody(r.Body) {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "shutdown commands do not accept input")
+		return
+	}
+	if h.shutdowner == nil || h.shutdowner.Shutdown() != nil {
+		writeError(w, r, http.StatusServiceUnavailable, "shutdown_failed", "shutdown request could not be initiated")
+		return
+	}
+	writeJSON(w, r, http.StatusAccepted, map[string]string{"result": "initiated"})
 }
 
 func emptyBody(body io.Reader) bool {

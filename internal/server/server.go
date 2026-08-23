@@ -41,6 +41,9 @@ func NewFromEnv() (*Server, error) {
 		KnownHostsPath: shutdownCfg.SSHKnownHostsPath,
 		Timeout:        shutdownCfg.SSHTimeout,
 	})
+	if err := shutdownAdapter.Validate(); err != nil {
+		return nil, errors.New("pc-control server configuration: invalid shutdown SSH material")
+	}
 	handler := httpapi.NewHandler(wake.New(sender), shutdown.New(shutdownAdapter))
 	return &Server{httpServer: &http.Server{
 		Addr:    cfg.HTTPListenAddr,

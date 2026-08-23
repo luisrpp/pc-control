@@ -318,7 +318,7 @@ func TestStartupRejectsInvalidShutdownKeyAndKnownHostsFiles(t *testing.T) {
 			if service != nil {
 				t.Error("NewFromEnv() returned a service for invalid shutdown file configuration")
 			}
-			if strings.Contains(err.Error(), path) || strings.Contains(err.Error(), test.data) {
+			if strings.Contains(err.Error(), path) || (test.data != "" && strings.Contains(err.Error(), test.data)) {
 				t.Error("startup diagnostic disclosed shutdown file path or contents")
 			}
 		})
