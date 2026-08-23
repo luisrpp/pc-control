@@ -6,17 +6,23 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/luisrpp/pc-control/internal/shutdown"
 	"github.com/luisrpp/pc-control/internal/wake"
 )
 
 // Handler is the HTTP adapter for the wake use case.
 type Handler struct {
-	waker *wake.UseCase
+	waker      *wake.UseCase
+	shutdowner *shutdown.UseCase
 }
 
 // NewHandler creates an HTTP adapter for waker.
-func NewHandler(waker *wake.UseCase) http.Handler {
-	return &Handler{waker: waker}
+func NewHandler(waker *wake.UseCase, shutdowners ...*shutdown.UseCase) http.Handler {
+	handler := &Handler{waker: waker}
+	if len(shutdowners) > 0 {
+		handler.shutdowner = shutdowners[0]
+	}
+	return handler
 }
 
 // ServeHTTP handles an HTTP request.

@@ -10,6 +10,8 @@ import (
 
 	"github.com/luisrpp/pc-control/internal/config"
 	"github.com/luisrpp/pc-control/internal/httpapi"
+	"github.com/luisrpp/pc-control/internal/shutdown"
+	"github.com/luisrpp/pc-control/internal/sshshutdown"
 	"github.com/luisrpp/pc-control/internal/wake"
 	"github.com/luisrpp/pc-control/internal/wol"
 )
@@ -25,9 +27,21 @@ func NewFromEnv() (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pc-control server configuration: %w", err)
 	}
+	shutdownCfg, err := config.LoadShutdownFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("pc-control server configuration: %w", err)
+	}
 
 	sender := wol.NewSender(cfg.WOLDestination, cfg.WOLPort, cfg.WOLMAC)
-	handler := httpapi.NewHandler(wake.New(sender))
+	shutdownAdapter := sshshutdown.New(sshshutdown.Config{
+		Host:           shutdownCfg.SSHHost,
+		Port:           shutdownCfg.SSHPort,
+		User:           shutdownCfg.SSHUser,
+		PrivateKeyPath: shutdownCfg.SSHPrivateKeyPath,
+		KnownHostsPath: shutdownCfg.SSHKnownHostsPath,
+		Timeout:        shutdownCfg.SSHTimeout,
+	})
+	handler := httpapi.NewHandler(wake.New(sender), shutdown.New(shutdownAdapter))
 	return &Server{httpServer: &http.Server{
 		Addr:    cfg.HTTPListenAddr,
 		Handler: handler,

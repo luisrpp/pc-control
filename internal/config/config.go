@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -26,6 +27,16 @@ type Config struct {
 	WOLPort        uint16
 }
 
+// ShutdownConfig holds graceful-shutdown configuration for composition.
+type ShutdownConfig struct {
+	SSHHost           string
+	SSHPort           uint16
+	SSHUser           string
+	SSHPrivateKeyPath string
+	SSHKnownHostsPath string
+	SSHTimeout        time.Duration
+}
+
 // LoadFromEnv loads runtime configuration from the process environment.
 func LoadFromEnv() (Config, error) {
 	raw := make(map[string]string, 4)
@@ -35,6 +46,18 @@ func LoadFromEnv() (Config, error) {
 		}
 	}
 	return parse(raw)
+}
+
+// LoadShutdownFromEnv is a structural placeholder until graceful-shutdown
+// configuration loading is implemented.
+func LoadShutdownFromEnv() (ShutdownConfig, error) {
+	return ShutdownConfig{}, nil
+}
+
+// parseShutdown is a structural placeholder until graceful-shutdown
+// configuration validation is implemented.
+func parseShutdown(raw map[string]string) (ShutdownConfig, error) {
+	return ShutdownConfig{}, nil
 }
 
 // parse validates the four raw configuration values. A missing map key means
