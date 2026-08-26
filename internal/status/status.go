@@ -27,8 +27,9 @@ func New(probe Probe) *UseCase {
 }
 
 // Status reports the immediate workstation status.
-//
-// Status behavior is implemented in the following production phase.
 func (u *UseCase) Status() Result {
-	return ""
+	if u.probe.Probe() != nil {
+		return Offline
+	}
+	return Online
 }

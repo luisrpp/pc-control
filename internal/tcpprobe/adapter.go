@@ -2,7 +2,8 @@
 package tcpprobe
 
 import (
-	"errors"
+	"net"
+	"strconv"
 	"time"
 )
 
@@ -24,8 +25,12 @@ func New(config Config) *Adapter {
 }
 
 // Probe performs one TCP reachability probe.
-//
-// TCP dialing behavior is implemented in the following production phase.
 func (a *Adapter) Probe() error {
-	return errors.New("TCP status probe is not implemented")
+	address := net.JoinHostPort(a.config.Host, strconv.FormatUint(uint64(a.config.Port), 10))
+	connection, err := (&net.Dialer{Timeout: a.config.Timeout}).Dial("tcp", address)
+	if err != nil {
+		return err
+	}
+	defer connection.Close()
+	return nil
 }

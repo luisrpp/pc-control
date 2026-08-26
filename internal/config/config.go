@@ -122,6 +122,17 @@ func parseShutdown(raw map[string]string) (ShutdownConfig, error) {
 		}
 	}
 
+	statusProbeTimeout := time.Second
+	if timeoutText, ok := raw[envStatusProbeTimeout]; ok {
+		if err := validateNoOuterWhitespace(timeoutText, envStatusProbeTimeout); err != nil || timeoutText == "" {
+			return ShutdownConfig{}, fmt.Errorf("pc-control configuration: invalid %s", envStatusProbeTimeout)
+		}
+		statusProbeTimeout, err = time.ParseDuration(timeoutText)
+		if err != nil || statusProbeTimeout <= 0 {
+			return ShutdownConfig{}, fmt.Errorf("pc-control configuration: invalid %s", envStatusProbeTimeout)
+		}
+	}
+
 	return ShutdownConfig{
 		SSHHost:            host,
 		SSHPort:            port,
@@ -129,7 +140,7 @@ func parseShutdown(raw map[string]string) (ShutdownConfig, error) {
 		SSHPrivateKeyPath:  privateKeyPath,
 		SSHKnownHostsPath:  knownHostsPath,
 		SSHTimeout:         timeout,
-		StatusProbeTimeout: 0,
+		StatusProbeTimeout: statusProbeTimeout,
 	}, nil
 }
 

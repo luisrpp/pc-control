@@ -40,6 +40,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveWake(w, r)
 	case exactPath(r, "/v1/shutdown"):
 		h.serveShutdown(w, r)
+	case exactPath(r, "/v1/status"):
+		h.serveStatus(w, r)
 	default:
 		writeError(w, r, http.StatusNotFound, "not_found", "requested endpoint was not found")
 	}
@@ -81,6 +83,19 @@ func (h *Handler) serveShutdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, r, http.StatusAccepted, map[string]string{"result": "initiated"})
+}
+
+func (h *Handler) serveStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", http.MethodGet)
+		writeError(w, r, http.StatusMethodNotAllowed, "method_not_allowed", "method is not allowed for this endpoint")
+		return
+	}
+	if r.URL.RawQuery != "" || !emptyBody(r.Body) {
+		writeError(w, r, http.StatusBadRequest, "invalid_request", "status requests do not accept input")
+		return
+	}
+	writeJSON(w, r, http.StatusOK, map[string]string{"status": string(h.statuser.Status())})
 }
 
 func emptyBody(body io.Reader) bool {
