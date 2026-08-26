@@ -1,109 +1,150 @@
 # pc-control
 
-`pc-control` is a standalone, portable, headless Go service for requesting a
-Wake-on-LAN (WOL) wake-up of one preconfigured workstation.
+`pc-control` is a small, headless Go service for one preconfigured
+workstation. It provides private HTTP operations to send a Wake-on-LAN packet,
+initiate a graceful shutdown, and observe TCP reachability of the configured
+SSH endpoint.
 
-## v0.1 capabilities and limits
+It has no application-level authentication. Place it behind an appropriate
+private-network and access-control boundary; do not expose it directly to the
+public Internet.
 
-v0.1 provides one HTTP command, `POST /v1/wake`. Each accepted request sends
-exactly one WOL Magic Packet to the configured destination and immediately
-returns success or failure for that local UDP operation.
+## API
 
-It supports exactly one workstation. It does not check whether the
-workstation is already running, confirm packet delivery or boot completion,
-retry failed sends, keep request history, or provide a web UI or
-application-level authentication.
+All operations accept no query parameters or request body. A trailing bare
+`?` is accepted. Invalid input returns `400`; an unsupported method on a
+known endpoint returns `405` with the endpoint's `Allow` header.
 
-## Requirements
-
-- Go 1.24 or later to run from source.
-- A target machine with Wake-on-LAN enabled.
-- A host capable of running the service and sending UDP traffic to the
-  target LAN.
-
-## Configure and run
-
-Configuration is supplied through environment variables:
-
-| Variable | Required | Description |
+| Request | Successful response | Meaning |
 | --- | --- | --- |
-| `PC_CONTROL_HTTP_LISTEN_ADDR` | Yes | HTTP bind address with an explicit numeric TCP port. |
-| `PC_CONTROL_WOL_MAC` | Yes | MAC address of the one target workstation. |
-| `PC_CONTROL_WOL_DESTINATION` | Yes | IPv4 UDP destination for the WOL Magic Packet. |
-| `PC_CONTROL_WOL_PORT` | No | UDP destination port; defaults to `9` when absent. |
+| `POST /v1/wake` | `200 {"result":"sent"}` | One local UDP WOL send succeeded. |
+| `POST /v1/shutdown` | `202 {"result":"initiated"}` | The configured SSH shutdown capability completed successfully. |
+| `GET /v1/status` | `200 {"status":"online"}` or `200 {"status":"offline"}` | One TCP dial to the configured SSH host and port succeeded or failed. |
 
-`PC_CONTROL_WOL_DESTINATION` is the **UDP destination**, normally the LAN
-broadcast address. It is not the target workstation's potentially changing
-DHCP/IP address.
-
-For example, with placeholder values only:
+For example, using an intentionally fictitious service name:
 
 ```sh
-export PC_CONTROL_HTTP_LISTEN_ADDR='127.0.0.1:8080'
-export PC_CONTROL_WOL_MAC='00:11:22:33:44:55'
-export PC_CONTROL_WOL_DESTINATION='192.168.1.255'
-# Optional; omit it to use the default UDP port 9.
-export PC_CONTROL_WOL_PORT='9'
+curl -X POST http://control.example.invalid:8080/v1/wake
+curl -X POST http://control.example.invalid:8080/v1/shutdown
+curl http://control.example.invalid:8080/v1/status
+```
+
+### Semantics and limits
+
+- Wake sends exactly one 102-byte WOL Magic Packet. `"sent"` confirms only
+  that local UDP send operation, not delivery, receipt, boot, or power state.
+- Shutdown performs exactly one SSH operation using the fixed client-side
+  `systemctl poweroff` capability. `"initiated"` does not prove shutdown
+  completion, an offline state, or that the literal command ran remotely.
+- Status performs exactly one TCP dial and sends no application or SSH bytes.
+  `"online"` means only that the configured TCP endpoint accepted that
+  connection. `"offline"` means the dial failed or timed out; neither result
+  establishes physical power state, boot completion, SSH authentication, or
+  general workstation health.
+- The service does not retry these operations, select targets, or keep request
+  history.
+
+The formal HTTP and operation contracts are in the [wake specification](specs/0001-wake-on-lan.md),
+[shutdown specification](specs/0002-shutdown.md), and [status specification](specs/0003-status.md).
+
+## Configuration
+
+Configuration is supplied through environment variables. Required values must
+be present and non-empty; leading or trailing whitespace is invalid. Optional
+defaults apply only when the variable is absent.
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `PC_CONTROL_HTTP_LISTEN_ADDR` | Yes | — | Bind address with an explicit numeric port. It accepts an IP literal or empty-host wildcard, not a hostname. |
+| `PC_CONTROL_WOL_MAC` | Yes | — | Target workstation MAC address. |
+| `PC_CONTROL_WOL_DESTINATION` | Yes | — | IPv4 UDP destination for the Magic Packet, usually a deployment-selected broadcast address. |
+| `PC_CONTROL_WOL_PORT` | No | `9` | UDP destination port. |
+| `PC_CONTROL_SHUTDOWN_SSH_HOST` | Yes | — | SSH host or IP literal without a port; status reuses it. |
+| `PC_CONTROL_SHUTDOWN_SSH_PORT` | No | `22` | SSH TCP port; status reuses it. |
+| `PC_CONTROL_SHUTDOWN_SSH_USER` | Yes | — | Dedicated restricted shutdown account. |
+| `PC_CONTROL_SHUTDOWN_SSH_PRIVATE_KEY_PATH` | Yes | — | Read-only mounted dedicated private-key file. |
+| `PC_CONTROL_SHUTDOWN_SSH_KNOWN_HOSTS_PATH` | Yes | — | Read-only mounted `known_hosts` data. |
+| `PC_CONTROL_SHUTDOWN_TIMEOUT` | No | `10s` | Positive Go duration covering the complete SSH shutdown operation. |
+| `PC_CONTROL_STATUS_PROBE_TIMEOUT` | No | `1s` | Positive Go duration that bounds the single status TCP dial. |
+
+For example, the following values are fictitious and contain no credentials:
+
+```sh
+export PC_CONTROL_HTTP_LISTEN_ADDR='[2001:db8::10]:8080'
+export PC_CONTROL_WOL_MAC='02:00:00:00:00:01'
+export PC_CONTROL_WOL_DESTINATION='192.0.2.255'
+export PC_CONTROL_SHUTDOWN_SSH_HOST='workstation.example.invalid'
+export PC_CONTROL_SHUTDOWN_SSH_USER='pc-control'
+export PC_CONTROL_SHUTDOWN_SSH_PRIVATE_KEY_PATH='/run/secrets/pc-control/shutdown_key'
+export PC_CONTROL_SHUTDOWN_SSH_KNOWN_HOSTS_PATH='/run/secrets/pc-control/known_hosts'
 
 go run ./cmd/pc-control
 ```
 
-The listen address must be an IPv4 literal, bracketed IPv6 literal, or an
-empty-host wildcard such as `:8080`; hostnames are not supported. The WOL
-destination must be a dotted-decimal IPv4 address.
+## SSH security
 
-## Request a wake
+The shutdown credential is a capability, not a general login. Provision the
+configured account and key so they can initiate only the intended graceful
+shutdown; they must not provide interactive shell access or arbitrary command
+execution. A target-side forced command is one suitable enforcement mechanism.
 
-Send an empty `POST` request to `/v1/wake`:
+The private key must be supplied as a dedicated file mounted read-only, never
+as an environment-variable value. Host-key verification against configured
+`known_hosts` data is mandatory on every shutdown connection; unknown keys are
+not accepted automatically. Keep both files out of source control and do not
+log or expose their contents.
 
-```sh
-curl -X POST http://127.0.0.1:8080/v1/wake
-```
+## Docker and Compose
 
-A successful request returns:
-
-```json
-{"result":"sent"}
-```
-
-> **Important:** `"sent"` means that the local UDP send succeeded. It does
-> not confirm that the packet was delivered, that the workstation received
-> it, or that the workstation woke.
-
-The endpoint accepts no query parameters or request body. A local WOL send
-failure returns `503 Service Unavailable`.
-
-## Verify
+Build and run with Compose after creating a deployment-specific `.env` from
+the example file:
 
 ```sh
+cp .env.example .env
+docker compose up --build -d
+```
+
+The supplied Compose configuration uses host networking so the UDP adapter can
+reach the network selected for WOL. It loads `.env`; populate every required
+shutdown setting there. It deliberately does not contain credentials or secret
+mounts. Add read-only mounts in a local Compose override that match the two
+configured container paths, for example with fictitious file names:
+
+```yaml
+# compose.override.yaml
+services:
+  pc-control:
+    volumes:
+      - ./example-secrets/shutdown_key:/run/secrets/pc-control/shutdown_key:ro
+      - ./example-secrets/known_hosts:/run/secrets/pc-control/known_hosts:ro
+```
+
+Choose deployment-specific network exposure, secret delivery, file ownership,
+and paths outside this repository. The service itself is not tied to any
+particular operating system, VPN, NAS, or hosting environment.
+
+## Development
+
+Go 1.24 or later is required to run from source.
+
+```sh
+go run ./cmd/pc-control
+go test -run '^$' ./...
 go test ./...
 go vet ./...
+git diff --check
 ```
 
-## Architecture
+## Architecture and further reading
 
-pc-control follows a small Ports & Adapters design:
+The service uses narrow Ports & Adapters boundaries:
 
 ```text
 HTTP adapter -> Wake use case -> Sender port <- UDP WOL adapter
+             -> Shutdown use case -> Shutdown port <- SSH shutdown adapter
+             -> Status use case -> Probe port <- TCP probe adapter
 ```
 
-The HTTP adapter handles the command and JSON response. The wake use case
-performs one send through its sender port, and the UDP WOL adapter constructs
-and sends the Magic Packet.
-
-## Security
-
-pc-control v0.1 has **no application-level authentication** and therefore
-must not be exposed directly to the public Internet. Protect access with a
-trusted network, VPN, firewall, reverse proxy, access-control layer, or
-equivalent surrounding deployment control.
-
-## Current scope / future work
-
-Workstation status, shutdown controls, multiple machines, deployment
-automation, and Second Brain integration are not part of v0.1.
-
-For detailed contracts and contributor context, see the [PRD](docs/prd.md),
-[architecture](docs/architecture.md), [Wake-on-LAN specification](specs/0001-wake-on-lan.md),
-[accepted ADRs](decisions/), and [test design](specs/0001-wake-on-lan-test-design.md).
+See the [PRD](docs/prd.md), [architecture](docs/architecture.md),
+[architecture decisions](decisions/), and the feature test designs in
+[specs](specs/).
