@@ -12,6 +12,8 @@ import (
 	"github.com/luisrpp/pc-control/internal/httpapi"
 	"github.com/luisrpp/pc-control/internal/shutdown"
 	"github.com/luisrpp/pc-control/internal/sshshutdown"
+	"github.com/luisrpp/pc-control/internal/status"
+	"github.com/luisrpp/pc-control/internal/tcpprobe"
 	"github.com/luisrpp/pc-control/internal/wake"
 	"github.com/luisrpp/pc-control/internal/wol"
 )
@@ -44,7 +46,12 @@ func NewFromEnv() (*Server, error) {
 	if err := shutdownAdapter.Validate(); err != nil {
 		return nil, errors.New("pc-control server configuration: invalid shutdown SSH material")
 	}
-	handler := httpapi.NewHandler(wake.New(sender), shutdown.New(shutdownAdapter))
+	probeAdapter := tcpprobe.New(tcpprobe.Config{
+		Host:    shutdownCfg.SSHHost,
+		Port:    shutdownCfg.SSHPort,
+		Timeout: shutdownCfg.StatusProbeTimeout,
+	})
+	handler := httpapi.NewHandlerWithStatus(wake.New(sender), shutdown.New(shutdownAdapter), status.New(probeAdapter))
 	return &Server{httpServer: &http.Server{
 		Addr:    cfg.HTTPListenAddr,
 		Handler: handler,

@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/luisrpp/pc-control/internal/shutdown"
+	"github.com/luisrpp/pc-control/internal/status"
 	"github.com/luisrpp/pc-control/internal/wake"
 )
 
@@ -14,6 +15,7 @@ import (
 type Handler struct {
 	waker      *wake.UseCase
 	shutdowner *shutdown.UseCase
+	statuser   *status.UseCase
 }
 
 // NewHandler creates an HTTP adapter for waker and, when provided, shutdowner.
@@ -23,6 +25,12 @@ func NewHandler(waker *wake.UseCase, shutdowners ...*shutdown.UseCase) http.Hand
 		handler.shutdowner = shutdowners[0]
 	}
 	return handler
+}
+
+// NewHandlerWithStatus creates an HTTP adapter with all configured use cases.
+// Status HTTP behavior is implemented in the following production phase.
+func NewHandlerWithStatus(waker *wake.UseCase, shutdowner *shutdown.UseCase, statuser *status.UseCase) http.Handler {
+	return &Handler{waker: waker, shutdowner: shutdowner, statuser: statuser}
 }
 
 // ServeHTTP handles an HTTP request.

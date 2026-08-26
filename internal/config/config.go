@@ -23,6 +23,7 @@ const (
 	envShutdownSSHPrivateKeyPath = "PC_CONTROL_SHUTDOWN_SSH_PRIVATE_KEY_PATH"
 	envShutdownSSHKnownHostsPath = "PC_CONTROL_SHUTDOWN_SSH_KNOWN_HOSTS_PATH"
 	envShutdownTimeout           = "PC_CONTROL_SHUTDOWN_TIMEOUT"
+	envStatusProbeTimeout        = "PC_CONTROL_STATUS_PROBE_TIMEOUT"
 )
 
 // Config is the validated runtime configuration used by composition.
@@ -35,12 +36,13 @@ type Config struct {
 
 // ShutdownConfig holds graceful-shutdown configuration for composition.
 type ShutdownConfig struct {
-	SSHHost           string
-	SSHPort           uint16
-	SSHUser           string
-	SSHPrivateKeyPath string
-	SSHKnownHostsPath string
-	SSHTimeout        time.Duration
+	SSHHost            string
+	SSHPort            uint16
+	SSHUser            string
+	SSHPrivateKeyPath  string
+	SSHKnownHostsPath  string
+	SSHTimeout         time.Duration
+	StatusProbeTimeout time.Duration
 }
 
 // LoadFromEnv loads runtime configuration from the process environment.
@@ -57,7 +59,7 @@ func LoadFromEnv() (Config, error) {
 // LoadShutdownFromEnv loads graceful-shutdown configuration from the process
 // environment.
 func LoadShutdownFromEnv() (ShutdownConfig, error) {
-	raw := make(map[string]string, 6)
+	raw := make(map[string]string, 7)
 	for _, key := range []string{
 		envShutdownSSHHost,
 		envShutdownSSHPort,
@@ -65,6 +67,7 @@ func LoadShutdownFromEnv() (ShutdownConfig, error) {
 		envShutdownSSHPrivateKeyPath,
 		envShutdownSSHKnownHostsPath,
 		envShutdownTimeout,
+		envStatusProbeTimeout,
 	} {
 		if value, ok := os.LookupEnv(key); ok {
 			raw[key] = value
@@ -120,12 +123,13 @@ func parseShutdown(raw map[string]string) (ShutdownConfig, error) {
 	}
 
 	return ShutdownConfig{
-		SSHHost:           host,
-		SSHPort:           port,
-		SSHUser:           user,
-		SSHPrivateKeyPath: privateKeyPath,
-		SSHKnownHostsPath: knownHostsPath,
-		SSHTimeout:        timeout,
+		SSHHost:            host,
+		SSHPort:            port,
+		SSHUser:            user,
+		SSHPrivateKeyPath:  privateKeyPath,
+		SSHKnownHostsPath:  knownHostsPath,
+		SSHTimeout:         timeout,
+		StatusProbeTimeout: 0,
 	}, nil
 }
 
