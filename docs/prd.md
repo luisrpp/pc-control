@@ -12,6 +12,8 @@ and access is provided through a deployment-specific private network boundary.
   be woken using Wake-on-LAN.
 - Allow the operator to remotely request that the same preconfigured
   workstation begin a normal graceful shutdown.
+- Allow the operator to check whether the configured workstation SSH TCP
+  endpoint is immediately reachable.
 - Provide a headless, programmatic interface suitable for direct use with an
   API client and future consumption by other applications.
 - Keep the service private: it must not be publicly reachable from the
@@ -61,6 +63,21 @@ pc-control does not check workstation availability or power state before the
 operation, and a successful result does not confirm that the workstation is
 offline or fully powered off.
 
+### Request workstation status
+
+1. An authorized client requests status through pc-control's remote
+   interface.
+2. pc-control performs one TCP reachability probe to the configured shutdown
+   SSH host and port.
+3. pc-control immediately reports whether that TCP dial operation succeeded
+   or failed within its probe timeout.
+
+An online result means only that the configured TCP endpoint accepted the
+probe connection. An offline result means only that the endpoint could not be
+reached by that probe. Neither result confirms the workstation's physical
+power state, boot completion, SSH authentication availability, or general
+health.
+
 ## Functional requirements
 
 1. pc-control shall support exactly one preconfigured workstation in v0.2.
@@ -92,6 +109,20 @@ offline or fully powered off.
 14. The credential used for remote shutdown shall be capable only of
     initiating the configured graceful shutdown and shall not provide
     general-purpose shell access or arbitrary command execution.
+15. pc-control shall expose a programmatic remote interface through which an
+    authorized client can request TCP reachability status for the configured
+    shutdown SSH host and port.
+16. For each accepted status request, pc-control shall perform exactly one
+    logical TCP probe operation and shall not itself retry, fall back, or make
+    another dial after failure.
+17. pc-control shall report online only when that TCP dial operation succeeds;
+    it shall report offline when the operation fails or reaches its probe
+    timeout.
+18. A status probe shall not perform SSH authentication or protocol traffic,
+    execute a remote command, or perform Wake-on-LAN.
+19. Status results shall not be treated as confirmation of physical power
+    state, boot completion, successful SSH authentication, or general
+    workstation health.
 
 ## Non-functional product requirements
 
@@ -121,6 +152,10 @@ offline or fully powered off.
 - A programmatic private remote wake request
 - One Wake-on-LAN attempt per request
 - Immediate sent-or-failed feedback
+- A programmatic private TCP reachability-status request
+- One TCP probe operation per accepted status request
+- Immediate online-or-offline feedback with the limited endpoint-reachability
+  meaning defined above
 
 ### Out of scope
 
@@ -128,12 +163,13 @@ offline or fully powered off.
 - Public Internet exposure
 - Application-level login, multi-user management, roles, or permissions
 - Selecting, registering, or managing multiple workstations
-- Determining whether the workstation is online or already running
+- Determining workstation state as part of a wake or shutdown request
 - Confirming boot completion or Wake-on-LAN delivery
 - Confirming shutdown completion, offline state, or powered-off state
 - Automatic retry behavior
 - Forced power-off, reboot, hibernation, maintenance, system updates, health
-  checks, monitoring, or arbitrary remote command execution
+  checks for pc-control itself, continuous workstation monitoring, or
+  arbitrary remote command execution
 - User-visible request history, audit trail, or persistent notifications
 - Second Brain functionality
 
@@ -141,17 +177,19 @@ offline or fully powered off.
 
 pc-control v0.2 is successful when the operator can, from a client within the
 private network boundary, make programmatic requests that cause pc-control to
-perform one Wake-on-LAN attempt or one remote graceful-shutdown operation for
-the preconfigured workstation and receive an immediate result for each local
-operation. A shutdown success indicates initiation or acceptance of the
-shutdown capability, not confirmed power-off.
+perform one Wake-on-LAN attempt, one remote graceful-shutdown operation, or
+one TCP reachability probe for the preconfigured workstation and receive an
+immediate result for each operation. A shutdown success indicates initiation
+or acceptance of the shutdown capability, not confirmed power-off. A status
+result reports only the outcome of its one TCP probe, not physical power state
+or general health.
 
 ## Deferred product evolution
 
 The following may be considered in future versions but are not v0.2
-requirements: multi-user access, multiple workstations, workstation status,
-shutdown completion or power-state confirmation, forced power controls,
-maintenance capabilities, notifications, and integration with a larger
+requirements: multi-user access, multiple workstations, shutdown completion
+or power-state confirmation, forced power controls, maintenance capabilities,
+continuous status monitoring, notifications, and integration with a larger
 personal Second Brain system.
 
 ## Architectural and implementation decisions deferred from this PRD

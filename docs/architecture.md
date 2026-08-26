@@ -8,10 +8,11 @@ Approved architecture for v0.2. This document derives from the approved
 ## Architectural intent
 
 pc-control is a small, headless Go service that accepts private,
-programmatic wake and graceful-shutdown commands for one preconfigured
-workstation. It makes exactly one Wake-on-LAN attempt for each accepted wake
-command and exactly one remote shutdown operation for each accepted shutdown
-command.
+programmatic wake and graceful-shutdown commands and reachability-status
+requests for one preconfigured workstation. It makes exactly one Wake-on-LAN
+attempt for each accepted wake command, exactly one remote shutdown operation
+for each accepted shutdown command, and exactly one logical TCP probe
+operation for each accepted status request.
 
 The design keeps application behavior independent of HTTP, UDP, SSH,
 Tailscale, Synology, containers, and other deployment-specific concerns. Side
@@ -29,19 +30,22 @@ HTTP/JSON adapter  ->  Wake application use case      ->  Wake sender port
                                                          ->  Native UDP WOL adapter
                    ->  Shutdown application use case  ->  Shutdown port
                                                          ->  Native SSH shutdown adapter
+                   ->  Status application use case    ->  Probe port
+                                                         ->  Native TCP probe adapter
 ```
 
 ### HTTP/JSON adapter
 
 The inbound adapter exposes the small, command-oriented programmatic
 interface. It is responsible only for HTTP concerns: decoding and validating
-transport input, invoking the wake or shutdown use case, mapping each
+transport input, invoking the wake, shutdown, or status use case, mapping each
 immediate outcome to an HTTP/JSON response, and request-scoped diagnostics.
 
-It does not construct Wake-on-LAN packets, perform UDP or SSH operations,
-determine workstation state, execute arbitrary remote commands, or contain
-Tailscale and deployment behavior. The standard Go HTTP facilities are the
-default choice; a web or RPC framework requires a concrete need.
+It does not construct Wake-on-LAN packets, perform UDP, TCP, or SSH
+operations, determine physical workstation state, execute arbitrary remote
+commands, or contain Tailscale and deployment behavior. The standard Go HTTP
+facilities are the default choice; a web or RPC framework requires a concrete
+need.
 
 The endpoint path, request body, response schema, and HTTP status mapping are
 deferred to feature specification.
@@ -78,6 +82,27 @@ general remote-command abstraction. It has no application-level login,
 authorization, user-management, Tailscale-specific concepts, or deployment
 logic.
 
+### Status application use case
+
+The application core defines a status request and its immediate online or
+offline result. It depends on a narrow semantic probe port, for example
+`Probe() error`, rather than on TCP, sockets, SSH, addresses, or timeouts.
+
+For each accepted status request, it invokes the probe port exactly once. A
+successful probe result maps to online; a failed or timed-out probe result maps
+to offline. It does not retry, fall back to another target, perform Wake-on-
+LAN, authenticate with SSH, send SSH protocol traffic, execute a command,
+persist results, or deduplicate requests. Duplicate and concurrent accepted
+requests are independent operations.
+
+Online means only that the configured TCP dial operation succeeded. Offline
+means only that it failed or reached the configured probe timeout. Neither
+result represents a physical power-state determination, boot-completion
+check, successful SSH authentication, or general workstation health.
+
+The core contains no networking or SSH-specific concepts and does not create a
+generic networking abstraction.
+
 ### Wake-on-LAN adapter
 
 The outbound adapter implements the wake-sender port using Go's native UDP
@@ -90,6 +115,20 @@ immediate inability to construct or send the packet is reported as failure.
 
 The WOL adapter does not invoke an operating-system utility or require an external
 Wake-on-LAN library.
+
+### TCP status probe adapter
+
+The outbound status adapter implements the probe port with Go's standard
+library TCP networking. For each invocation, it performs one TCP dial
+operation to the configured shutdown SSH host and port under the configured
+probe timeout, and closes a successful connection without sending application
+or SSH protocol bytes.
+
+The adapter performs no SSH authentication, remote command, Wake-on-LAN
+operation, retry loop, fallback loop, repeated probe, or second dial after a
+failure. It introduces no manual DNS resolution or address-selection policy:
+normal hostname resolution and address selection inside the Go standard
+library networking stack are implementation details, not pc-control retries.
 
 ### SSH shutdown adapter
 
@@ -122,20 +161,22 @@ failure and does not retry.
 
 ### Composition and configuration
 
-A small composition layer creates and connects the HTTP adapter, wake and
-shutdown use cases, UDP and SSH adapters, configuration, and logging. Runtime
-configuration remains outside the application core. Environment variables are
-the initial default configuration mechanism; no general configuration subsystem
-is needed.
+A small composition layer creates and connects the HTTP adapter, wake,
+shutdown, and status use cases, UDP, SSH, and TCP adapters, configuration, and
+logging. Runtime configuration remains outside the application core.
+Environment variables are the initial default configuration mechanism; no
+general configuration subsystem is needed.
 
 Configuration must provide the workstation's Wake-on-LAN parameters, SSH
-shutdown target and credential-file parameters, shutdown timeout, and HTTP
-listen address and port. Secrets are supplied as mounted files rather than
-environment-variable contents. Exact variable names, validation rules, and
-network defaults are specified by feature specifications. Invalid or incomplete
-required configuration, unreadable credential or known-hosts files, and
-malformed key material prevent normal startup and are reported through safe
-operational diagnostics.
+shutdown target and credential-file parameters, shutdown timeout, status probe
+timeout, and HTTP listen address and port. The status adapter reuses the SSH
+shutdown host and port; it has no second target configuration. Secrets are
+supplied as mounted files rather than environment-variable contents. Exact
+variable names, validation rules, and network defaults are specified by feature
+specifications. Invalid or incomplete required configuration, unreadable
+credential or known-hosts files, malformed key material, and invalid status
+probe timeout prevent normal startup and are reported through safe operational
+diagnostics.
 
 ## Network, authorization, and deployment boundaries
 
@@ -154,30 +195,34 @@ hosting platform, container runtime, or host. It must run locally for
 development and testing. Native-process and container packaging remain deferred
 deployment decisions. Any selected
 runtime/deployment arrangement must allow the UDP adapter to reach the local
-LAN broadcast domain needed for Wake-on-LAN and the SSH adapter to reach the
-configured workstation SSH service.
+LAN broadcast domain needed for Wake-on-LAN and the SSH and TCP status adapters
+to reach the configured workstation SSH TCP endpoint.
 
 ## Operational behavior
 
 pc-control emits basic structured logs for startup, configuration failures,
-wake and shutdown requests, successful boundary operations, and failures.
+wake, shutdown, and status requests, successful boundary operations, and
+failures.
 Logs are for operational diagnosis only; they are not a user-visible request
 history or audit trail. Diagnostics must not disclose private-key material,
 credentials, raw SSH errors, remote command output, or other sensitive
 deployment details to HTTP clients.
 
-No health endpoint is part of v0.2 architecture. One may be added only when a
-selected deployment mechanism establishes a concrete need.
+`GET /v1/status` is a workstation TCP-endpoint observation, not a pc-control
+service health endpoint. No service health endpoint is part of v0.2
+architecture. One may be added only when a selected deployment mechanism
+establishes a concrete need.
 
 ## Testability consequences
 
-The wake and shutdown application use cases are testable deterministically by
-substituting their narrow outbound ports. HTTP handling, native UDP sending,
-and native SSH behavior can be verified through integration tests at their
-respective boundaries. SSH tests use a local fake SSH server and never shut
-down a real workstation. Application behavior therefore need not depend on
-real Tailscale, Synology, containers, physical Wake-on-LAN hardware, or a
-workstation during testing.
+The wake, shutdown, and status application use cases are testable
+deterministically by substituting their narrow outbound ports. HTTP handling,
+native UDP sending, native SSH behavior, and native TCP probing can be
+verified through integration tests at their respective boundaries. SSH tests
+use a local fake SSH server and TCP tests use loopback-only listeners; neither
+contacts or shuts down a real workstation. Application behavior therefore need
+not depend on real Tailscale, Synology, containers, physical Wake-on-LAN
+hardware, or a workstation during testing.
 
 The detailed test suite, test tooling, and test cases are deferred to later
 delivery phases.
