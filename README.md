@@ -75,8 +75,8 @@ export PC_CONTROL_WOL_MAC='02:00:00:00:00:01'
 export PC_CONTROL_WOL_DESTINATION='192.0.2.255'
 export PC_CONTROL_SHUTDOWN_SSH_HOST='workstation.example.invalid'
 export PC_CONTROL_SHUTDOWN_SSH_USER='pc-control'
-export PC_CONTROL_SHUTDOWN_SSH_PRIVATE_KEY_PATH='/run/secrets/pc-control/shutdown_key'
-export PC_CONTROL_SHUTDOWN_SSH_KNOWN_HOSTS_PATH='/run/secrets/pc-control/known_hosts'
+export PC_CONTROL_SHUTDOWN_SSH_PRIVATE_KEY_PATH='/run/pc-control/ssh/private_key'
+export PC_CONTROL_SHUTDOWN_SSH_KNOWN_HOSTS_PATH='/run/pc-control/ssh/known_hosts'
 
 go run ./cmd/pc-control
 ```
@@ -106,22 +106,16 @@ docker compose up --build -d
 
 The supplied Compose configuration uses host networking so the UDP adapter can
 reach the network selected for WOL. It loads `.env`; populate every required
-shutdown setting there. It deliberately does not contain credentials or secret
-mounts. Add read-only mounts in a local Compose override that match the two
-configured container paths, for example with fictitious file names:
+shutdown setting there. It mounts the deployment-provided SSH files read-only:
 
-```yaml
-# compose.override.yaml
-services:
-  pc-control:
-    volumes:
-      - ./example-secrets/shutdown_key:/run/secrets/pc-control/shutdown_key:ro
-      - ./example-secrets/known_hosts:/run/secrets/pc-control/known_hosts:ro
-```
+- `./secrets/private_key` → `/run/pc-control/ssh/private_key`
+- `./secrets/known_hosts` → `/run/pc-control/ssh/known_hosts`
 
-Choose deployment-specific network exposure, secret delivery, file ownership,
-and paths outside this repository. The service itself is not tied to any
-particular operating system, VPN, NAS, or hosting environment.
+Provision those files locally, keep them out of source control, and ensure the
+private key is readable by the container's runtime user. Choose deployment-
+specific network exposure, secret delivery, file ownership, and paths outside
+this repository. The service itself is not tied to any particular operating
+system, VPN, NAS, or hosting environment.
 
 ## Development
 
