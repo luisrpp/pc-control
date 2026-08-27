@@ -44,6 +44,16 @@ curl http://control.example.invalid:8080/v1/status
 - The service does not retry these operations, select targets, or keep request
   history.
 
+### Target workstation support
+
+pc-control is currently developed and tested against an Arch Linux workstation
+using systemd and OpenSSH. Wake-on-LAN itself is not Arch-specific, and status
+is a TCP reachability probe rather than an Arch-specific health check.
+Graceful shutdown currently depends on the target's SSH configuration and the
+systemd command `systemctl poweroff`. Other Linux distributions with compatible
+systemd and OpenSSH setups may work, but are not currently tested or
+supported. Windows is not currently supported for graceful shutdown.
+
 The formal HTTP and operation contracts are in the [wake specification](specs/0001-wake-on-lan.md),
 [shutdown specification](specs/0002-shutdown.md), and [status specification](specs/0003-status.md).
 
