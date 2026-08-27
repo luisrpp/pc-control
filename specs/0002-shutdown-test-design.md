@@ -25,7 +25,8 @@ interfaces, mock libraries, or implementation structure.
 - Native HTTP and SSH behavior is tested at those boundaries with local
   loopback resources.
 - No test requires a physical workstation, a real `systemctl` invocation,
-  Tailscale, Synology, Docker, Internet access, or an actual target SSH host.
+  private deployment infrastructure, Docker, Internet access, or an actual
+  target SSH host.
 - A successful SSH operation is never treated as evidence that the workstation
   powered off, is offline, or literally executed the client-side command.
 - Test fixtures use generated ephemeral host keys and temporary dedicated
@@ -228,7 +229,7 @@ system shutdown.
 The suite does not test actual workstation reachability, target-side
 `authorized_keys` or sudo provisioning, whether a forced command replaces the
 client-side command, actual execution of `systemctl poweroff`, shutdown
-completion, offline state, Tailscale authorization, public-exposure policy,
-Synology, container deployment, Docker, persistence, retry scheduling, or
-hardware behavior. These are outside Specification 0002 or deliberately
-outside pc-control v0.2.
+completion, offline state, private-network authorization, public-exposure
+policy, deployment platforms, container deployment, Docker, persistence, retry
+scheduling, or hardware behavior. These are outside Specification 0002 or
+deliberately outside pc-control v0.2.

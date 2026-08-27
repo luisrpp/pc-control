@@ -125,7 +125,7 @@ Provision those files locally, keep them out of source control, and ensure the
 private key is readable by the container's runtime user. Choose deployment-
 specific network exposure, secret delivery, file ownership, and paths outside
 this repository. The service itself is not tied to any particular operating
-system, VPN, NAS, or hosting environment.
+system, private-network service, or hosting environment.
 
 ## Development
 

@@ -25,8 +25,8 @@ interfaces, mock libraries, or implementation structure.
 - Substitution is used only at real architectural boundaries.
 - Native HTTP and TCP behavior is tested at those boundaries with local
   loopback resources.
-- No test contacts the real workstation, NAS, Tailscale network, Internet, or
-  another external host.
+- No test contacts the real workstation, private deployment network, Internet,
+  or another external host.
 - Tests do not infer physical power state, boot completion, SSH
   authentication, SSH protocol availability, or general health from an online
   result.
@@ -191,8 +191,8 @@ is not preemptively separated or tagged as deployment-specific.
 ## Determinism and isolation controls
 
 - Use `127.0.0.1` loopback TCP listeners only for network behavior; never
-  depend on broadcasts, routes, the real workstation, NAS, Tailscale, or an
-  external host.
+  depend on broadcasts, routes, the real workstation, private deployment
+  infrastructure, or an external host.
 - Coordinate concurrent and cancellation tests with barriers or channels, not
   time-based sleeps.
 - Apply short bounded timeouts only to genuinely asynchronous local socket
@@ -205,7 +205,7 @@ is not preemptively separated or tagged as deployment-specific.
 
 The suite does not test physical workstation power state, boot completion, SSH
 authentication or command execution, SSH host-key verification, general host
-health, DNS/address-selection policy, Tailscale authorization, public-exposure
-policy, Synology, container deployment, Docker, retry scheduling, or external
-network reachability. These are outside Specification 0003 or deliberately
-outside pc-control v0.2.
+health, DNS/address-selection policy, private-network authorization,
+public-exposure policy, deployment platforms, container deployment, Docker,
+retry scheduling, or external network reachability. These are outside
+Specification 0003 or deliberately outside pc-control v0.2.

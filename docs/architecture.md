@@ -15,7 +15,8 @@ for each accepted shutdown command, and exactly one logical TCP probe
 operation for each accepted status request.
 
 The design keeps application behavior independent of HTTP, UDP, SSH,
-Tailscale, Synology, containers, and other deployment-specific concerns. Side
+private-network services, hosting platforms, containers, and other
+deployment-specific concerns. Side
 effects are concentrated in adapters at the system boundary. Dependencies point
 inward toward the application core.
 
@@ -43,9 +44,9 @@ immediate outcome to an HTTP/JSON response, and request-scoped diagnostics.
 
 It does not construct Wake-on-LAN packets, perform UDP, TCP, or SSH
 operations, determine physical workstation state, execute arbitrary remote
-commands, or contain Tailscale and deployment behavior. The standard Go HTTP
-facilities are the default choice; a web or RPC framework requires a concrete
-need.
+commands, or contain private-network or deployment behavior. The standard Go
+HTTP facilities are the default choice; a web or RPC framework requires a
+concrete need.
 
 The endpoint path, request body, response schema, and HTTP status mapping are
 deferred to feature specification.
@@ -62,7 +63,7 @@ Duplicate requests are acceptable and each results in an independent
 Wake-on-LAN attempt.
 
 The core contains no application-level login, authorization, user-management,
-Tailscale-specific concepts, or deployment logic.
+private-network-specific concepts, or deployment logic.
 
 ### Shutdown application use case
 
@@ -79,8 +80,8 @@ are independent operations.
 
 The core contains no SSH-specific concepts and exposes neither a shell nor a
 general remote-command abstraction. It has no application-level login,
-authorization, user-management, Tailscale-specific concepts, or deployment
-logic.
+authorization, user-management, private-network-specific concepts, or
+deployment logic.
 
 ### Status application use case
 
@@ -181,13 +182,13 @@ diagnostics.
 ## Network, authorization, and deployment boundaries
 
 pc-control does not implement authorization or own the private-network
-exposure policy in v0.2. Tailscale and surrounding network/deployment controls
-are responsible for limiting access to authorized clients and avoiding public
+exposure policy in v0.2. Surrounding network and deployment controls are
+responsible for limiting access to authorized clients and avoiding public
 Internet exposure.
 
 The HTTP listen address and port are externally configurable. Their concrete
-defaults, and the mechanism used to expose the service through Tailscale or
-other network infrastructure, are deployment/configuration decisions and are
+defaults, and the mechanism used to expose the service through private-network
+or other network infrastructure, are deployment/configuration decisions and are
 not established by this architecture.
 
 The core application has no dependency on a particular private-network service,
@@ -221,8 +222,8 @@ native UDP sending, native SSH behavior, and native TCP probing can be
 verified through integration tests at their respective boundaries. SSH tests
 use a local fake SSH server and TCP tests use loopback-only listeners; neither
 contacts or shuts down a real workstation. Application behavior therefore need
-not depend on real Tailscale, Synology, containers, physical Wake-on-LAN
-hardware, or a workstation during testing.
+not depend on real private-network services, deployment platforms, containers,
+physical Wake-on-LAN hardware, or a workstation during testing.
 
 The detailed test suite, test tooling, and test cases are deferred to later
 delivery phases.
@@ -231,8 +232,8 @@ delivery phases.
 
 - Future HTTP endpoint, request/response formats, and status/error mapping.
 - Future configuration variable names, validation details, and network defaults.
-- Concrete listen-address defaults and Tailscale/network publication setup.
-- Native-process versus container packaging and Synology service integration.
+- Concrete listen-address defaults and private-network publication setup.
+- Native-process versus container packaging and host service integration.
 - Exact target-side SSH restriction mechanism, provided it enforces the
   required shutdown-only capability.
 - Logging library, log schema, and Go package layout.

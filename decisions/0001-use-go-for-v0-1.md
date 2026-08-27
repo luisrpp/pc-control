@@ -36,7 +36,8 @@ frameworks and dependencies require a concrete v0.1 need.
 - Interfaces are used only where they express a concrete boundary or enable
   substitution at that boundary; Go abstractions are not added merely to
   imitate architectural patterns from another ecosystem.
-- Application behavior can be tested independently from HTTP, UDP, Tailscale,
-  Synology, containers, and hardware by substituting the wake-sender port.
+- Application behavior can be tested independently from HTTP, UDP, private-
+  network services, deployment platforms, containers, and hardware by
+  substituting the wake-sender port.
 - The final Go package layout, module setup, dependency list, and test tooling
   remain deferred to implementation and delivery phases.

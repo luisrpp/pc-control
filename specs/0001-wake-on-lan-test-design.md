@@ -25,8 +25,9 @@ interfaces, mock libraries, or implementation structure.
 - Substitution is used only at real architectural boundaries.
 - Native HTTP and UDP behavior is tested at those boundaries with local
   sockets.
-- No test requires a physical workstation, Wake-on-LAN hardware, Synology,
-  Tailscale, Docker, Internet access, or a LAN broadcast domain.
+- No test requires a physical workstation, Wake-on-LAN hardware, private
+  deployment infrastructure, Docker, Internet access, or a LAN broadcast
+  domain.
 - A successful local UDP send is never treated as evidence of packet
   delivery, workstation receipt, workstation state, or boot completion.
 
@@ -210,7 +211,8 @@ it is not preemptively separated or tagged as deployment-specific.
 ## Explicit non-goals of this suite
 
 The suite does not test workstation reachability, receipt of a Magic Packet,
-boot completion, Tailscale authorization, public-exposure policy, Synology,
-container deployment, Docker, persistence, retry scheduling, or hardware
-Wake-on-LAN behavior. These are outside Specification 0001 or deliberately
+boot completion, private-network authorization, public-exposure policy,
+deployment platforms, container deployment, Docker, persistence, retry
+scheduling, or hardware Wake-on-LAN behavior. These are outside Specification
+0001 or deliberately
 outside pc-control v0.1.
